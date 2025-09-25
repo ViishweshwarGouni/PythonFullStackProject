@@ -1,46 +1,71 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, relationship
 import os
+from supabase import create_client, Client
 from dotenv import load_dotenv
-import datetime
 
+# Load environment variables
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///eco_tracker.db")
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 
-engine = create_engine(DATABASE_URL, echo=True)
-SessionLocal = sessionmaker(bind=engine)
-Base = declarative_base()
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ----------------- MODELS -----------------
-class User(Base):
-    __tablename__ = "users"
+# ---------------------------
+# User Management
+# ---------------------------
+def add_user(name, email, password_hash, age=None, location=None):
+    return supabase.table("users").insert({
+        "name": name,
+        "email": email,
+        "password_hash": password_hash,
+        "age": age,
+        "location": location
+    }).execute()
 
-    id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, nullable=False)
-    email = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
+def get_user_by_email(email):
+    return supabase.table("users").select("*").eq("email", email).execute()
 
-    activities = relationship("Activity", back_populates="user")
+# ---------------------------
+# Activities & Categories
+# ---------------------------
+def add_activity_category(name, description=None):
+    return supabase.table("activity_categories").insert({
+        "name": name,
+        "description": description
+    }).execute()
 
+def get_categories():
+    return supabase.table("activity_categories").select("*").execute()
 
-class Activity(Base):
-    __tablename__ = "activities"
+def add_activity(user_id, category_id, description, value, unit, emission_factor, date=None):
+    return supabase.table("activities").insert({
+        "user_id": user_id,
+        "category_id": category_id,
+        "description": description,
+        "value": value,
+        "unit": unit,
+        "emission_factor": emission_factor,
+        "date": date
+    }).execute()
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    category = Column(String, nullable=False)  # transport, electricity, food
-    value = Column(Float, nullable=False)      # e.g., km travelled, kWh, meals
-    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+def get_user_activities(user_id):
+    return supabase.table("activities").select("*").eq("user_id", user_id).execute()
 
-    user = relationship("User", back_populates="activities")
+# ---------------------------
+# Carbon Logs
+# ---------------------------
+def add_carbon_log(user_id, total_emission, log_date=None):
+    return supabase.table("carbon_logs").insert({
+        "user_id": user_id,
+        "total_emission": total_emission,
+        "log_date": log_date
+    }).execute()
 
+def get_user_logs(user_id):
+    return supabase.table("carbon_logs").select("*").eq("user_id", user_id).execute()
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
-    print("✅ Database initialized successfully!")
-
-
-if __name__ == "__main__":
-    init_db()
+# ---------------------------
+# Suggestions
+# ---------------------------
+def get_suggestions_by_category(category_id):
+    return supabase.table("suggestions").select("*").eq("category_id", category_id).execute()
